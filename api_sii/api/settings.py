@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     'libredte.apps.LibredteConfig',
     'rest_framework',
     'rest_framework.authtoken',
+    'rest_framework_simplejwt',  # Add this line
 ]
 
 REST_FRAMEWORK = {
