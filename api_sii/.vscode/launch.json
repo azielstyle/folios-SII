@@ -1,0 +1,38 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python Debugger: Django",
+            "type": "debugpy",
+            "request": "launch",
+            "args": [
+                "runserver"
+            ],
+            "django": true,
+            "autoStartBrowser": false,
+            "program": "${workspaceFolder}/manage.py"
+        },
+        {
+            "name": "Uvicorn (ASGI)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/venv/bin/uvicorn", // Ruta a Uvicorn en tu entorno virtual
+            "args": [
+                "api.asgi:application", // Tu archivo ASGI
+                "--host",
+                "0.0.0.0",
+                "--port",
+                "8000",
+                "--reload",
+            ],
+            "env": {
+                "DJANGO_SETTINGS_MODULE": "kraken.settings"
+            },
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+    ]
+}
