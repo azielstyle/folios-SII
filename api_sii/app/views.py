@@ -3,7 +3,8 @@ import json, os, time, subprocess,glob, base64
 from requests import Session
 from pathlib import Path
 from selenium.webdriver.firefox.options import Options
-from selenium.webdriver import Firefox,FirefoxProfile
+from selenium.webdriver.firefox.service import Service
+from selenium.webdriver import Firefox, FirefoxProfile, FirefoxOptions
 from selenium.webdriver.support.ui import Select
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.common.by import By
@@ -25,15 +26,29 @@ type_doc = ["33","43","46","56","61"]
 # Create your views here.
 
 
+def convert_pfx_to_pem(pfx_path, pem_path, password=None):
+    try:
+        command = ['openssl', 'pkcs12', '-in', pfx_path, '-out', pem_path, '-nodes']
+        print(command)
+        if password:
+            command.extend(['-password', f'pass:{password}'])
+        subprocess.run(command, check=True)
+        return pem_path
+    except subprocess.CalledProcessError as e:
+        print(f"Error converting PFX to PEM: {e}")
+        return None
+    
 def check_status(rut):
     try:
+        
         cliente=Cliente.objects.filter(rut=rut)
         estado=cliente[0].Estado
         if not estado:
             return 'No tiene acceso'
         else:
             return None
-    except:
+    except Exception as e:
+        logger.error(f"Error: {e}")
         return 'No tiene acceso'
 
 def login(rut_cliente):
@@ -42,13 +57,22 @@ def login(rut_cliente):
 
     logger.info(msg='login de usuario:'+rut_cliente )
     try:
-        company = Cliente.objects.filter(rut=rut_cliente)    
-        cert_path = company[0].certificate.path
-        install_path = os.path.join(BASE_DIR,'data/Install_certificate.sh')
-        print(install_path, cert_path)
-        subprocess.run(['bash', install_path,cert_path,company[0].name])
+        #company = Cliente.objects.filter(rut=rut_cliente)    
+        pfx_path = os.path.join(BASE_DIR,'data/certificados/1720221622_universo_113728.pfx')
+        pem_path = os.path.join(BASE_DIR, 'data', f'1720221622_universo_113728.pem')
+        
+        # Convert PFX to PEM
+        pem_path = convert_pfx_to_pem(pfx_path, pem_path, password='113728')
+        if not pem_path:
+            raise Exception("Failed to convert PFX to PEM")
+
+
+        install_path = os.path.join(BASE_DIR, 'data/Install_certificate.sh')
+        print(install_path, pem_path)
+        subprocess.run(['bash', install_path, pem_path, 'universo'])
         # print('La instalacion finalizo con codigo:', cert_install.returncode)
-    except:
+    except Exception as e:
+        logger.error(f"Error during login: {e}")
         response={}
         response['estado']='Error'
         response['msg']='Error al encontrar la compañia o instalar certificados. Compruebe e intente nuevamente'
@@ -58,7 +82,7 @@ def login(rut_cliente):
         s=Session()
         s.get(url_inicio) 
         url_post = 'https://herculesr.sii.cl/cgi_AUT2000/CAutInicio.cgi?https://misiir.sii.cl/cgi_misii/siihome.cgi'
-        s.post(url_post,cert=cert_path, allow_redirects=True, data={'rut' : rut,
+        s.post(url_post,cert=pem_path, allow_redirects=True, data={'rut' : rut,
                 'referencia' : 'https://www.sii.cl',
                 'dv': dv})
         time.sleep(1)
@@ -129,6 +153,7 @@ class PedirFolios(View):
         
         firefox_opt = Options() #FirefoxOptions()
         firefox_opt.headless=True
+        firefox_opt.add_argument("--headless")
         firefox_prof = FirefoxProfile(profile_directory=os.path.join(files_path,'profile'))
         firefox_prof.set_preference("browser.download.manager.showWhenStarting", False)
         firefox_prof.set_preference("browser.download.folderList",2)
@@ -137,18 +162,33 @@ class PedirFolios(View):
         firefox_prof.set_preference("browser.download.viewableInternally.enabledTypes", "")
         firefox_prof.set_preference("browser.helperApps.neverAsk.saveToDisk",
                                "text/xml,application/xml,application/octet-stream")
+        
+        # Configurar la estrategia de carga de página
+        firefox_opt.page_load_strategy = 'eager'  # Puede ser 'normal', 'eager' o 'none'
+
+        # Añadir el perfil a las opciones
+        firefox_opt.profile = firefox_prof
+
         driver_path=os.path.join(files_path,'driver/geckodriver')
         rut,dv = rut.split('-')
         try:
-            #agregar options para ejecutar en servidor
-            driver = Firefox(executable_path=driver_path,firefox_profile=firefox_prof,options=firefox_opt)
+            # Crear un servicio para el controlador
+            service = Service(executable_path=driver_path)
+            # Inicializar el controlador Firefox con el servicio y las opciones
+            print('Iniciando driver')
+            driver = Firefox(service=service, options=firefox_opt)
+            print('Driver iniciado')
+            # Esperar a que la página se cargue completamente
+            WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.TAG_NAME, 'body')))
+    
+            # Navegar al dominio correcto antes de agregar las cookies
             driver.get(url_inicio)
             for cookie in cookies:
                 driver.add_cookie({
                     'name': cookie.name,
                     'value': cookie.value,
                     'path': '/',
-                    'domain': cookie.domain
+                    'domain': 'sii.cl'
                 })
             # print('cookies driver post get:\n' , driver.get_cookies(),'\n\n')
             driver.get(url_folios)
@@ -158,8 +198,11 @@ class PedirFolios(View):
             input_rut.send_keys(str(rut))
             input_dv.send_keys(str(dv))
             driver.find_element(By.NAME,'ACEPTAR').click()                           
-        except:
-            driver.close()
+        except  Exception as e:
+            logger.error(f"Error: {e}")
+            print(f"Error: {e}")
+            if driver:
+                driver.close()
             l=Log(user = rut,msg =' Error en el driver,no se aceptan las cookies', service='PedirFolios')
             l.save()
             er=Errors(user = rut,msg=' Error en el driver,no se aceptan las cookies', service='PedirFolios')
@@ -322,7 +365,8 @@ class AnularFolios(View):
             select_doc = Select(WebDriverWait(driver,5).until(EC.element_to_be_clickable((By.NAME,'COD_DOCTO'))))
             select_doc.select_by_value(cod_doc)
             driver.find_element(By.NAME,'ACEPTAR').click()
-        except:
+        except Exception as e:
+            logger.error(f"Error: {e}")
             l=Log(user=rut,msg=' Error en el driver, no se aceptan las cookies', service='AnularFolios')
             l.save()
             logger.info(msg=rut+'-Error en el driver, no se aceptan las cookies')
@@ -405,7 +449,8 @@ class AnularFolios(View):
                 logger.info(msg=rut+'-No fue posible anular los folios')
                 return HttpResponse(json.dumps(response))
                 # return Response(resp ,status.HTTP_404_NOT_FOUND)
-            except:
+            except Exception as e:
+                logger.error(f"Error: {e}")
                 texto = WebDriverWait(driver,5).until(EC.presence_of_element_located((By.XPATH,'/html/body/center[2]/table[1]')))
                 l=Log(user=rut,msg=' El folio solicitado ya fue anulado', service='AnularFolios')
                 l.save()
@@ -484,7 +529,8 @@ class ConsultarFolio(View):
             select_doc = Select(WebDriverWait(driver,10).until(EC.element_to_be_clickable((By.NAME,'COD_DOCTO'))))
             select_doc.select_by_value(cod_doc)
             driver.find_element(By.NAME,'ACEPTAR').click()
-        except:
+        except Exception as e:
+            logger.error(f"Error: {e}")
             l=Log(user=rut,msg=' Error en el driver,no se aceptan las cookies', service='ConsultaFolios')
             l.save()
             logger.info(msg=rut+'-Error en el driver,no se aceptan las cookies')

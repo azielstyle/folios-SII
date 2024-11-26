@@ -1,0 +1,25 @@
+
+@base_url =http://127.0.0.1:8000
+@token=dc07191145cf33626898e41423a81a3ef70f3235
+###
+post {{base_url}}/auth
+Content-Type: application/json
+
+{
+    "username": "aziel",
+    "password": "sunshiner"
+}
+
+#`request.get("http://ip_host:port/api/solicitarFolios", headers={"Authorization":"Token 80af2d944cbf55bfc2fec00b49f90dcd389626f2"}, data={"rut":"1234567-8","cant_folios":"1",'cod_doc':"33"} `
+
+###
+get {{base_url}}/api/solicitarFolios
+Authorization: Token {{token}}
+Content-Type: application/json
+
+{
+    "rut": "11372848-5",
+    "cant_folios": "1000",
+    "cod_doc": "33",
+    "ambiente": "prod"
+}

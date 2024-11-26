@@ -15,7 +15,7 @@ fi
 certificate_file="$1"
 certificate_name="$2"
 # Cambiar ruta para buscar cert9.db
-ruta="$(pwd)/api_sii/data/profile"
+ruta="$(pwd)/data/profile"
 echo ${ruta}
 for certDB in $(find ${ruta} -name "cert9.db")
 do
