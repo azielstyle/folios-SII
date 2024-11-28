@@ -86,8 +86,8 @@ class GenerateCaf(View):
         cookies = self.login(rut_cliente=rut, password= password, company_rut=company_rut, pfx_path=pfx_path)
         
         firefox_opt = Options() #FirefoxOptions()
-        firefox_opt.headless=False
-        # firefox_opt.add_argument("--headless")
+        firefox_opt.headless=True
+        firefox_opt.add_argument("--headless")
         firefox_prof = FirefoxProfile(profile_directory=os.path.join(files_path,'profile'))
         firefox_prof.set_preference("browser.download.manager.showWhenStarting", False)
         firefox_prof.set_preference("browser.download.folderList",2)
@@ -147,7 +147,7 @@ class GenerateCaf(View):
             response['msg']='Driver no acepta cookies'
             return HttpResponse(json.dumps(response))
         
-        # print('Se solicita el folio')
+        print('Se solicita el folio')
         try:
             select_doc = Select(WebDriverWait(driver,5).until(EC.element_to_be_clickable((By.NAME,'COD_DOCTO'))))
             select_doc.select_by_value(str(cod_doc))
@@ -174,12 +174,12 @@ class GenerateCaf(View):
             #Probar si se encuentra alguna alerta o error
             WebDriverWait(driver,5).until(EC.element_to_be_clickable((By.NAME,'ACEPTAR'))).click()
 
-        except:
-            # print('texto')
+        except Exception as e:
+            print('error en la solicitud de folios:',e)
             text_box=WebDriverWait(driver,5).until(EC.presence_of_element_located((By.XPATH,'/html/body/center[2]')))
             response={}
             response['estado']='Error'
-            response['msg'] = text_box.text
+            response['msg'] = f'{text_box.text} \n || {e}'
             driver.close()
             return HttpResponse(json.dumps(response))
     
@@ -201,10 +201,10 @@ class GenerateCaf(View):
             return HttpResponse(json.dumps(response))
                                 
         except TimeoutException:
-            # print('descargar xml')
+            print('descargar xml')
             # cuando la pagina sea la correcta se descarga el archivo
             WebDriverWait(driver,5).until(EC.element_to_be_clickable((By.NAME,'ACEPTAR'))).click()
-            # print('Descargar XML de folio')
+            print('Descargar XML de folio')
             boton_descarga = WebDriverWait(driver,5).until(EC.element_to_be_clickable((By.NAME,'ACEPTAR')))
             boton_descarga.click() 
             # Retornar archivo
@@ -214,6 +214,7 @@ class GenerateCaf(View):
             with open(max_file,'r', encoding='ISO-8859-1') as f:
                 xml=f.read()
                 print(xml)
+            print("archivo descargado:", xml)
             response = HttpResponse(xml, content_type='application/xml')
             response['Content-Disposition'] = 'attachment; filename="response.xml"'
             return response
