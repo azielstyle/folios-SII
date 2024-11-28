@@ -5,8 +5,12 @@ services:
     build:
       context: .
     ports:
-      - "8000-8006:8000"
+      - "8080-8090:8000"
     volumes:
       - .:/app
+      - app_data:/app/data
     command: python manage.py runserver 0.0.0.0:8000
     scale: 2
+
+volumes:
+  app_data:
