@@ -107,16 +107,6 @@ WSGI_APPLICATION = 'api.wsgi.application'
 # https://docs.djangoproject.com/en/4.0/ref/settings/#databases
 
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME': env('POSTGRES_DB'),
-        'USER':env('POSTGRES_USER'),
-        'PASSWORD':env('POSTGRES_PASSWORD'),
-        'HOST':env('POSTGRES_HOST'),
-        'PORT':env('POSTGRES_PORT'),
-    }
-}
 
 # Password validation
 # https://docs.djangoproject.com/en/4.0/ref/settings/#auth-password-validators
